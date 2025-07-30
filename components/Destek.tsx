@@ -56,11 +56,12 @@ const Chatbot: React.FC = () => {
     useEffect(() => {
         const initChat = async () => {
             try {
-                if (!process.env.API_KEY) {
-                    setError("API anahtarı bulunamadı. Lütfen yönetici ile iletişime geçin.");
+                const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+                if (!apiKey) {
+                    setError("VITE_GEMINI_API_KEY environment variable is not set.");
                     return;
                 }
-                const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
+                const ai = new GoogleGenAI({apiKey: apiKey});
                 const chat = ai.chats.create({
                     model: 'gemini-2.5-flash',
                     config: {

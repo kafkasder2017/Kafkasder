@@ -2,11 +2,13 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { DashboardStats, Person, YardimBasvurusu, BasvuruOncelik, DepoUrunu, StokTahmini, GonderimTuru, ExtractedKimlikData, DashboardInsight, ChatMessage, Etkinlik, Gonullu, GonulluDurum, Beceri, VolunteerSuggestion, HesapKategorisi, ExtractedApplicationData, Sentiment, YardimTuru, AnalyticsSummary } from '../types';
 import { getPeople, getYardimBasvurulari } from "./apiService";
 
-if (!process.env.API_KEY) {
-    console.warn("API_KEY environment variable not set. Gemini API features will not work.");
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+
+if (!apiKey) {
+    console.warn("VITE_GEMINI_API_KEY environment variable not set. Gemini API features will not work.");
 }
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+const ai = new GoogleGenAI({ apiKey: apiKey! });
 const STABLE_MODEL = "gemini-2.5-flash";
 
 
@@ -43,7 +45,7 @@ async function filterDataWithAI<T extends { id: any }>(
     contextPrompt: string,
     errorContext: string
 ): Promise<number[]> {
-    if (!process.env.API_KEY) {
+    if (!apiKey) {
         throw new Error("API anahtarı ayarlanmamış.");
     }
     
@@ -95,7 +97,7 @@ async function filterDataWithAI<T extends { id: any }>(
 
 
 export const generateReportSummary = async (stats: DashboardStats): Promise<string> => {
-    if (!process.env.API_KEY) {
+    if (!apiKey) {
         return Promise.reject(new Error("API anahtarı ayarlanmamış. Lütfen yönetici ile iletişime geçin."));
     }
 
@@ -176,7 +178,7 @@ export const smartSearchPeople = async (query: string): Promise<Person[]> => {
 };
 
 export const generateDavaKonusu = async (muvekkil: string, karsiTaraf: string, davaTuru: string): Promise<string> => {
-    if (!process.env.API_KEY) {
+    if (!apiKey) {
         return Promise.reject(new Error("API anahtarı ayarlanmamış. Lütfen yönetici ile iletişime geçin."));
     }
     
@@ -210,7 +212,7 @@ export const generateDavaKonusu = async (muvekkil: string, karsiTaraf: string, d
 };
 
 export const analyzeApplication = async (applicationText: string): Promise<{ ozet: string; oncelik: BasvuruOncelik }> => {
-    if (!process.env.API_KEY) {
+    if (!apiKey) {
         return Promise.reject(new Error("API anahtarı ayarlanmamış."));
     }
     const prompt = `
@@ -252,7 +254,7 @@ export const analyzeApplication = async (applicationText: string): Promise<{ oze
 };
 
 export const predictStockNeeds = async (stockData: DepoUrunu[]): Promise<StokTahmini[]> => {
-    if (!process.env.API_KEY) {
+    if (!apiKey) {
         return Promise.reject(new Error("API anahtarı ayarlanmamış."));
     }
     const prompt = `
@@ -299,7 +301,7 @@ export const predictStockNeeds = async (stockData: DepoUrunu[]): Promise<StokTah
 };
 
 export const generateProjectPlan = async (title: string): Promise<{ description: string; budget: number; }> => {
-    if (!process.env.API_KEY) {
+    if (!apiKey) {
         return Promise.reject(new Error("API anahtarı ayarlanmamış."));
     }
     const prompt = `
@@ -340,7 +342,7 @@ export const generateProjectPlan = async (title: string): Promise<{ description:
 };
 
 export const generateCommunicationMessage = async (topic: string, audience: string, type: GonderimTuru): Promise<string> => {
-    if (!process.env.API_KEY) {
+    if (!apiKey) {
         return Promise.reject(new Error("API anahtarı ayarlanmamış."));
     }
 
@@ -375,7 +377,7 @@ export const generateCommunicationMessage = async (topic: string, audience: stri
 };
 
 export const generateAidatHatirlatma = async (uyeAdi: string, donem: string, tutar: number): Promise<string> => {
-    if (!process.env.API_KEY) {
+    if (!apiKey) {
         return Promise.reject(new Error("API anahtarı ayarlanmamış."));
     }
     
@@ -407,7 +409,7 @@ export const generateAidatHatirlatma = async (uyeAdi: string, donem: string, tut
 };
 
 export const generateDonationReportSummary = async (stats: { totalDonations: number, donorCount: number, topDonationType: string, monthlyAverage: number }): Promise<string> => {
-    if (!process.env.API_KEY) {
+    if (!apiKey) {
         return Promise.reject(new Error("API anahtarı ayarlanmamış."));
     }
 
@@ -438,7 +440,7 @@ export const generateDonationReportSummary = async (stats: { totalDonations: num
 };
 
 export const analyzeDocumentContent = async (docName: string, docType: string): Promise<string> => {
-    if (!process.env.API_KEY) {
+    if (!apiKey) {
         return Promise.reject(new Error("API anahtarı ayarlanmamış."));
     }
 
@@ -464,7 +466,7 @@ export const analyzeDocumentContent = async (docName: string, docType: string): 
 };
 
 export const extractInfoFromDocumentImage = async (imageData: string | File): Promise<ExtractedKimlikData> => {
-    if (!process.env.API_KEY) {
+    if (!apiKey) {
         return Promise.reject(new Error("API anahtarı ayarlanmamış."));
     }
 
@@ -506,7 +508,7 @@ export const extractInfoFromDocumentImage = async (imageData: string | File): Pr
 };
 
 export const summarizeUploadedDocument = async (file: File): Promise<string> => {
-    if (!process.env.API_KEY) {
+    if (!apiKey) {
         return Promise.reject(new Error("API anahtarı ayarlanmamış."));
     }
     
@@ -542,7 +544,7 @@ export const generateDashboardInsights = async (
         monthlyDonationTotal: number;
     }
 ): Promise<DashboardInsight[]> => {
-    if (!process.env.API_KEY) {
+    if (!apiKey) {
         return Promise.reject(new Error("API anahtarı ayarlanmamış."));
     }
 
@@ -608,7 +610,7 @@ export const suggestVolunteersForEvent = async (
     event: Etkinlik,
     volunteers: EnrichedGonullu[]
 ): Promise<VolunteerSuggestion[]> => {
-    if (!process.env.API_KEY) {
+    if (!apiKey) {
         return Promise.reject(new Error("API anahtarı ayarlanmamış."));
     }
 
@@ -682,7 +684,7 @@ export const suggestVolunteersForEvent = async (
 };
 
 export const suggestFinancialCategory = async (description: string): Promise<HesapKategorisi> => {
-    if (!process.env.API_KEY) {
+    if (!apiKey) {
         return Promise.reject(new Error("API anahtarı ayarlanmamış."));
     }
 
@@ -730,7 +732,7 @@ export const suggestFinancialCategory = async (description: string): Promise<Hes
 };
 
 export const extractApplicationInfoFromDocument = async (file: File): Promise<ExtractedApplicationData> => {
-    if (!process.env.API_KEY) {
+    if (!apiKey) {
         return Promise.reject(new Error("API anahtarı ayarlanmamış."));
     }
 
@@ -772,7 +774,7 @@ export const extractApplicationInfoFromDocument = async (file: File): Promise<Ex
 };
 
 export const analyzeCommentSentiment = async (commentText: string): Promise<{ sentiment: Sentiment; reason: string }> => {
-    if (!process.env.API_KEY) {
+    if (!apiKey) {
         throw new Error("API anahtarı ayarlanmamış.");
     }
 
@@ -821,7 +823,7 @@ export const analyzeCommentSentiment = async (commentText: string): Promise<{ se
 };
 
 export const generateImageTags = async (file: File): Promise<string[]> => {
-    if (!process.env.API_KEY) {
+    if (!apiKey) {
         console.warn("API_KEY not set. Cannot generate image tags.");
         return [];
     }
@@ -868,7 +870,7 @@ export const generateAnalyticsSummary = async (
         monthlyFinancials: { name: string; income: number; expense: number }[];
     }
 ): Promise<AnalyticsSummary> => {
-    if (!process.env.API_KEY) {
+    if (!apiKey) {
         return Promise.reject(new Error("API anahtarı ayarlanmamış."));
     }
 
