@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Upload, FileText, Users, DollarSign, Calendar, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
-import { Person, Bagis, Proje, Etkinlik } from '../types';
+import { Person, Bagis, Proje, Etkinlik, Uyruk, KimlikTuru, SponsorlukTipi, RizaBeyaniStatus, DosyaBaglantisi, PersonStatus } from '../types';
 
 interface ImportResult {
   success: number;
@@ -215,21 +215,21 @@ const BulkImport: React.FC = () => {
       adres: row.adres || '',
       kategori: row.kategori || 'Üye',
       dogumTarihi: row.dogum_tarihi || '',
-      uyruk: ['TC'],
-      kimlikTuru: 'T.C. Kimlik No',
+      uyruk: [Uyruk.TC],
+      kimlikTuru: KimlikTuru.TC,
       ulke: 'Türkiye',
       sehir: '',
       yerlesim: '',
       mahalle: '',
       dosyaNumarasi: `IMPORT-${Date.now()}-${rowNumber}`,
-      sponsorlukTipi: 'Bireysel',
+      sponsorlukTipi: SponsorlukTipi.BIREYSEL,
       kayitDurumu: 'Kaydedildi',
-      rizaBeyani: 'ALINMADI',
+      rizaBeyani: RizaBeyaniStatus.ALINMADI,
       kayitTarihi: new Date().toISOString(),
       kaydiAcanBirim: 'Toplu Import',
-      dosyaBaglantisi: 'Bağımsız',
+      dosyaBaglantisi: DosyaBaglantisi.BAGIMSIZ,
       isKaydiSil: false,
-      durum: 'Aktif'
+      durum: PersonStatus.AKTIF
     };
 
     const { error } = await supabase.from('persons').insert(personData);
