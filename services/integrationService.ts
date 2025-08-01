@@ -92,7 +92,7 @@ export interface WhatsAppSonuc {
 
 // Muhasebe Entegrasyonu Fonksiyonları
 export const muhasebeKaydiGonder = async (
-entegrasyon: MuhasebeEntegrasyonu, test: Mocha.TestFunction, kayit: MuhasebeKaydi): Promise<{ basarili: boolean; hata?: string }> => {
+entegrasyon: MuhasebeEntegrasyonu, kayit: MuhasebeKaydi): Promise<{ basarili: boolean; hata?: string }> => {
   try {
     const response = await fetch(`${entegrasyon.apiUrl}/api/kayit`, {
       method: 'POST',
@@ -137,7 +137,7 @@ export const bagisiMuhasebeKaydet = async (
     kategori: 'BAGIS' as HesapKategorisi
   };
 
-  const result = await muhasebeKaydiGonder(entegrasyon, test, kayit);
+  const result = await muhasebeKaydiGonder(entegrasyon, kayit);
   if (!result.basarili) {
     throw new Error(`Muhasebe kaydı gönderilemedi: ${result.hata}`);
   }

@@ -128,9 +128,9 @@ const MuhasebeEntegrasyonu: React.FC = () => {
             tip: 'bagis',
             tarih: bagis.tarih,
             tutar: bagis.tutar,
-            aciklama: `Bağış - ${bagis.bagisciAd} ${bagis.bagisciSoyad}`,
+            aciklama: `Bağış - ID: ${bagis.id}`,
             hesapKodu: '120.01.001', // Bağış Gelirleri
-            tcVkn: bagis.bagisciTcKimlik,
+            tcVkn: '',
             durum: 'bekliyor'
           });
         }
@@ -143,7 +143,7 @@ const MuhasebeEntegrasyonu: React.FC = () => {
         const mevcutKayit = muhasebeKayitlari.find(k => k.id === `finansal-${kayit.id}`);
         
         if (!mevcutKayit) {
-          const tip = kayit.islemTuru === 'gelir' ? 'gelir' : 'gider';
+          const tip = kayit.tur === 'Gelir' ? 'gelir' : 'gider';
           
           yeniKayitlar.push({
             id: `finansal-${kayit.id}`,
@@ -152,7 +152,7 @@ const MuhasebeEntegrasyonu: React.FC = () => {
             tutar: kayit.tutar,
             aciklama: kayit.aciklama,
             hesapKodu: getHesapKodu(kayit.kategori, tip),
-            faturaNumarasi: kayit.faturaNumarasi,
+            faturaNumarasi: kayit.belgeNo || '',
             durum: 'bekliyor'
           });
         }
@@ -230,12 +230,12 @@ const MuhasebeEntegrasyonu: React.FC = () => {
         try {
           const sonuc = await muhasebeKaydiGonder(entegrasyonAyarlari.muhasebe, {
             tarih: kayit.tarih,
-            tutar: kayit.tutar,
+            borc: kayit.tip === 'gider' ? kayit.tutar : 0,
+            alacak: kayit.tip === 'gelir' ? kayit.tutar : 0,
             aciklama: kayit.aciklama,
             hesapKodu: kayit.hesapKodu!,
-            faturaNumarasi: kayit.faturaNumarasi,
-            vergiDairesi: kayit.vergiDairesi,
-            tcVkn: kayit.tcVkn
+            belgeNo: kayit.faturaNumarasi || '',
+            kategori: kayit.tip === 'gelir' ? 'DIGER_GELIR' as any : 'DIGER_GIDER' as any
           });
 
           const kayitIndex = guncelKayitlar.findIndex(k => k.id === kayit.id);
@@ -243,7 +243,7 @@ const MuhasebeEntegrasyonu: React.FC = () => {
             guncelKayitlar[kayitIndex] = {
               ...guncelKayitlar[kayitIndex],
               durum: sonuc.basarili ? 'gonderildi' : 'hata',
-              muhasebeId: sonuc.muhasebeId,
+              muhasebeId: sonuc.basarili ? 'sent' : undefined,
               hata: sonuc.hata,
               gonderimZamani: new Date().toISOString()
             };

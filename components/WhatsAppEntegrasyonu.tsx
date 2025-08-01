@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MessageCircle, Send, Users, Clock, CheckCircle, XCircle, Phone, FileText, Image, Video } from 'lucide-react';
 import { whatsappMesajGonder, topluWhatsAppMesaji, entegrasyonAyarlari } from '../services/integrationService';
+import type { WhatsAppMesaj } from '../services/integrationService';
 import { getPeople } from '../services/apiService';
 import type { Person } from '../types';
 
@@ -60,7 +61,7 @@ const defaultSablonlar: MesajSablonu[] = [
 const WhatsAppEntegrasyonu: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [kisiler, setKisiler] = useState<Person[]>([]);
-  const [selectedKisiler, setSelectedKisiler] = useState<Set<string>>(new Set());
+  const [selectedKisiler, setSelectedKisiler] = useState<Set<number>>(new Set());
   const [mesajTipi, setMesajTipi] = useState<'tekli' | 'toplu'>('tekli');
   const [sablonlar, setSablonlar] = useState<MesajSablonu[]>(defaultSablonlar);
   const [selectedSablon, setSelectedSablon] = useState<string>('');
@@ -95,7 +96,7 @@ const WhatsAppEntegrasyonu: React.FC = () => {
   const loadKisiler = async () => {
     try {
       const data = await getPeople();
-      setKisiler(data.filter(k => k.telefon && k.telefon.length > 0));
+      setKisiler(data.filter(k => k.cepTelefonu && k.cepTelefonu.length > 0));
     } catch (error) {
       console.error('Kişiler yüklenirken hata:', error);
     }
@@ -172,11 +173,17 @@ const WhatsAppEntegrasyonu: React.FC = () => {
         .replace('{ad}', tekliAlici.ad || '')
         .replace('{soyad}', tekliAlici.soyad || '');
 
+      const mesaj: WhatsAppMesaj = {
+        aliciNumara: tekliAlici.telefon,
+        mesajTipi: 'text',
+        icerik: kisiselMesaj,
+        medyaUrl: medyaDosyasi ? URL.createObjectURL(medyaDosyasi) : undefined
+      };
+
       const sonuc = await whatsappMesajGonder(
-        entegrasyonAyarlari.whatsapp,
-        tekliAlici.telefon,
-        kisiselMesaj,
-        medyaDosyasi || undefined
+        mesaj,
+        entegrasyonAyarlari.whatsapp.accessToken,
+        entegrasyonAyarlari.whatsapp.phoneNumberId
       );
 
       if (sonuc.basarili) {
@@ -214,10 +221,10 @@ const WhatsAppEntegrasyonu: React.FC = () => {
         let kisiselMesaj = mesajIcerik
           .replace('{ad}', kisi.ad)
           .replace('{soyad}', kisi.soyad)
-          .replace('{telefon}', kisi.telefon || '');
+          .replace('{telefon}', kisi.cepTelefonu || '');
 
         return {
-          telefon: kisi.telefon!,
+          telefon: kisi.cepTelefonu!,
           mesaj: kisiselMesaj,
           kisiId: kisi.id,
           ad: kisi.ad
@@ -225,28 +232,36 @@ const WhatsAppEntegrasyonu: React.FC = () => {
       });
 
       // Toplu gönderim
+      const alicilar = mesajlar.map(m => m.telefon);
+      const mesajSablonu: Omit<WhatsAppMesaj, 'aliciNumara'> = {
+        mesajTipi: 'text',
+        icerik: mesajIcerik,
+        medyaUrl: medyaDosyasi ? URL.createObjectURL(medyaDosyasi) : undefined
+      };
+
       const sonuc = await topluWhatsAppMesaji(
-        entegrasyonAyarlari.whatsapp,
-        mesajlar,
-        medyaDosyasi || undefined
+        alicilar,
+        mesajSablonu,
+        entegrasyonAyarlari.whatsapp.accessToken,
+        entegrasyonAyarlari.whatsapp.phoneNumberId
       );
 
       // Sonuçları işle
-      sonuc.forEach((item, index) => {
-        const kisi = seciliKisiler[index];
+      basarili = sonuc.basarili;
+      basarisiz = sonuc.basarisiz;
+      
+      // Detayları oluştur
+      seciliKisiler.forEach((kisi, index) => {
         const detay: GonderimDetay = {
-          aliciId: kisi.id,
-          telefon: kisi.telefon!,
+          aliciId: kisi.id.toString(),
+          telefon: kisi.cepTelefonu!,
           ad: `${kisi.ad} ${kisi.soyad}`,
-          durum: item.basarili ? 'gonderildi' : 'basarisiz',
+          durum: index < sonuc.basarili ? 'gonderildi' : 'basarisiz',
           gonderimZamani: new Date().toISOString()
         };
 
-        if (!item.basarili) {
-          detay.hata = item.hata;
-          basarisiz++;
-        } else {
-          basarili++;
+        if (index >= sonuc.basarili) {
+          detay.hata = sonuc.hatalar[index - sonuc.basarili] || 'Bilinmeyen hata';
         }
 
         yeniDetaylar.push(detay);
@@ -276,7 +291,7 @@ const WhatsAppEntegrasyonu: React.FC = () => {
     }
   };
 
-  const toggleKisi = (kisiId: string) => {
+  const toggleKisi = (kisiId: number) => {
     const newSelected = new Set(selectedKisiler);
     if (newSelected.has(kisiId)) {
       newSelected.delete(kisiId);
@@ -319,7 +334,7 @@ const WhatsAppEntegrasyonu: React.FC = () => {
     const searchMatch = 
       kisi.ad.toLowerCase().includes(searchTerm.toLowerCase()) ||
       kisi.soyad.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      kisi.telefon?.includes(searchTerm);
+              kisi.cepTelefonu?.includes(searchTerm);
     
     return searchMatch;
   });
@@ -660,7 +675,7 @@ const WhatsAppEntegrasyonu: React.FC = () => {
                     <td className="px-4 py-2 text-sm text-gray-900">
                       <div className="flex items-center gap-2">
                         <Phone size={14} className="text-gray-400" />
-                        {formatTelefon(kisi.telefon!)}
+                        {formatTelefon(kisi.cepTelefonu!)}
                       </div>
                     </td>
                   </tr>

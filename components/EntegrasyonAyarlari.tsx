@@ -5,6 +5,7 @@ import type {
   BankaEntegrasyonu,
   WhatsAppMesaj
 } from '../services/integrationService';
+import { HesapKategorisi } from '../types';
 import {
   muhasebeKaydiGonder,
   bankaHareketleriniAl,
@@ -89,7 +90,7 @@ const EntegrasyonAyarlari: React.FC = () => {
         alacak: 1,
         tarih: new Date().toISOString().split('T')[0],
         belgeNo: 'TEST-001',
-        kategori: 'DIGER_GELIR' as const
+        kategori: HesapKategorisi.DIGER_GELIR
       };
 
       const sonuc = await muhasebeKaydiGonder(muhasebeAyarlari, testKayit);

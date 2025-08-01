@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import path from 'path'
+import { resolve } from 'node:path'
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -23,13 +23,13 @@ export default defineConfig({
   // Path resolution for better imports
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './'),
-      '@/components': path.resolve(__dirname, './components'),
-      '@/services': path.resolve(__dirname, './services'),
-      '@/hooks': path.resolve(__dirname, './hooks'),
-      '@/data': path.resolve(__dirname, './data'),
-      '@/types': path.resolve(__dirname, './types.ts'),
-      '@/constants': path.resolve(__dirname, './constants.tsx')
+      '@': resolve(__dirname, './'),
+      '@/components': resolve(__dirname, './components'),
+      '@/services': resolve(__dirname, './services'),
+      '@/hooks': resolve(__dirname, './hooks'),
+      '@/data': resolve(__dirname, './data'),
+      '@/types': resolve(__dirname, './types.ts'),
+      '@/constants': resolve(__dirname, './constants.tsx')
     }
   },
 
