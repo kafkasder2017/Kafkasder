@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { serveStatic } from "hono/deno";
 
-const PORT = parseInt(Deno.env.get("PORT") || "8000");
-const app = new Hono();
+export const PORT = parseInt(Deno.env.get("PORT") || "8000");
+export const app = new Hono();
 
 // Serve static files from dist directory
 app.use("/*", serveStatic({ root: "./dist" }));
