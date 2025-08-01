@@ -5,6 +5,16 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  repository_dispatch:
+    types:
+      - 'vercel.deployment.success'
+      - 'vercel.deployment.error'
+      - 'vercel.deployment.canceled'
+      - 'vercel.deployment.ignored'
+      - 'vercel.deployment.skipped'
+      - 'vercel.deployment.pending'
+      - 'vercel.deployment.failed'
+      - 'vercel.deployment.promoted'
 
 jobs:
   deploy:
@@ -48,4 +58,11 @@ jobs:
     
     - name: Deploy Project Artifacts to Vercel
       run: vercel deploy --prebuilt --prod --token=Q6s7u39j25K3eipLl35BLstr
+      
+    - name: Get Deployment URL
+      id: deployment
+      run: |
+        DEPLOYMENT_URL=$(vercel ls --token=Q6s7u39j25K3eipLl35BLstr | grep "Production" | awk '{print $2}')
+        echo "deployment_url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
+        echo "Deployment URL: $DEPLOYMENT_URL"
           
