@@ -1,451 +1,518 @@
 import React, { useState, useRef } from 'react';
-import { toast } from 'react-hot-toast';
-import {
-  bulkImport,
-  parseCSV,
-  parseJSON,
-  parseExcel,
-  generateCSVTemplate,
-  SupportedDataType,
-  BulkImportResult,
-  BulkImportOptions
-} from '../services/bulkImportService';
+import { Upload, FileText, Users, DollarSign, Calendar, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { supabase } from '../services/supabaseClient';
+import { Person, Bagis, Proje, Etkinlik } from '../types';
 
-interface FileData {
+interface ImportResult {
+  success: number;
+  failed: number;
+  errors: string[];
+  warnings: string[];
+}
+
+interface ImportTemplate {
   name: string;
-  size: number;
-  type: string;
-  data: any[];
+  description: string;
+  fields: string[];
+  sampleData: any[];
 }
-
-interface ImportSettings {
-  skipErrors: boolean;
-  batchSize: number;
-  validateOnly: boolean;
-}
-
-const dataTypeLabels: Record<SupportedDataType, string> = {
-  kisiler: 'Kişiler',
-  projeler: 'Projeler',
-  bagislar: 'Bağışlar',
-  yardim_basvurulari: 'Yardım Başvuruları',
-  davalar: 'Davalar',
-  odemeler: 'Ödemeler',
-  finansal_kayitlar: 'Finansal Kayıtlar',
-  gonulluler: 'Gönüllüler',
-  vefa_destek: 'Vefa Destek',
-  kumbaralar: 'Kumbaralar',
-  depo_urunleri: 'Depo Ürünleri',
-  yetimler: 'Yetimler',
-  ogrenci_burslari: 'Öğrenci Bursları',
-  etkinlikler: 'Etkinlikler',
-  ayni_yardim_islemleri: 'Ayni Yardım İşlemleri',
-  hizmetler: 'Hizmetler',
-  hastane_sevkler: 'Hastane Sevkler',
-  kurumlar: 'Kurumlar'
-};
 
 const BulkImport: React.FC = () => {
-  const [selectedDataType, setSelectedDataType] = useState<SupportedDataType>('kisiler');
-  const [uploadedFile, setUploadedFile] = useState<FileData | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [importType, setImportType] = useState<'persons' | 'donations' | 'projects' | 'events'>('persons');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [results, setResults] = useState<ImportResult | null>(null);
   const [previewData, setPreviewData] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [result, setResult] = useState<BulkImportResult | null>(null);
-  const [showPreview, setShowPreview] = useState(false);
-  const [settings, setSettings] = useState<ImportSettings>({
-    skipErrors: true,
-    batchSize: 50,
-    validateOnly: false
-  });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setIsLoading(true);
-    try {
-      let data: any[] = [];
-      const fileType = file.type;
-      const fileName = file.name.toLowerCase();
-
-      if (fileName.endsWith('.csv') || fileType === 'text/csv') {
-        const text = await file.text();
-        data = parseCSV(text);
-      } else if (fileName.endsWith('.json') || fileType === 'application/json') {
-        const text = await file.text();
-        data = parseJSON(text);
-      } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
-        const text = await file.text();
-        data = parseExcel(text);
-      } else {
-        throw new Error('Desteklenmeyen dosya formatı. CSV, JSON veya Excel dosyası yükleyin.');
-      }
-
-      const fileData: FileData = {
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        data
-      };
-
-      setUploadedFile(fileData);
-      setPreviewData(data.slice(0, 10)); // İlk 10 kaydı önizleme için göster
-      setShowPreview(true);
-      toast.success(`${data.length} kayıt başarıyla yüklendi`);
-    } catch (error) {
-      toast.error(`Dosya yükleme hatası: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`);
-    } finally {
-      setIsLoading(false);
+  const importTemplates: Record<string, ImportTemplate> = {
+    persons: {
+      name: 'Kişi Verileri',
+      description: 'Üye, bağışçı ve yardım alan kişilerin bilgileri',
+      fields: ['ad', 'soyad', 'tc_kimlik', 'telefon', 'email', 'adres', 'kategori', 'dogum_tarihi'],
+      sampleData: [
+        {
+          ad: 'Ahmet',
+          soyad: 'Yılmaz',
+          tc_kimlik: '12345678901',
+          telefon: '05551234567',
+          email: 'ahmet@example.com',
+          adres: 'İstanbul, Türkiye',
+          kategori: 'Üye',
+          dogum_tarihi: '1990-01-01'
+        }
+      ]
+    },
+    donations: {
+      name: 'Bağış Verileri',
+      description: 'Bağış kayıtları ve detayları',
+      fields: ['bagisci_ad', 'bagisci_soyad', 'tutar', 'para_birimi', 'bagis_turu', 'tarih', 'aciklama'],
+      sampleData: [
+        {
+          bagisci_ad: 'Mehmet',
+          bagisci_soyad: 'Demir',
+          tutar: 1000,
+          para_birimi: 'TRY',
+          bagis_turu: 'Nakit',
+          tarih: '2024-01-15',
+          aciklama: 'Aylık bağış'
+        }
+      ]
+    },
+    projects: {
+      name: 'Proje Verileri',
+      description: 'Proje bilgileri ve detayları',
+      fields: ['proje_adi', 'sorumlu', 'baslangic_tarihi', 'bitis_tarihi', 'butce', 'durum', 'aciklama'],
+      sampleData: [
+        {
+          proje_adi: 'Eğitim Desteği',
+          sorumlu: 'Ayşe Kaya',
+          baslangic_tarihi: '2024-01-01',
+          bitis_tarihi: '2024-12-31',
+          butce: 50000,
+          durum: 'Devam Ediyor',
+          aciklama: 'Öğrenci burs projesi'
+        }
+      ]
+    },
+    events: {
+      name: 'Etkinlik Verileri',
+      description: 'Etkinlik bilgileri ve organizasyon detayları',
+      fields: ['etkinlik_adi', 'tarih', 'saat', 'konum', 'sorumlu', 'durum', 'aciklama'],
+      sampleData: [
+        {
+          etkinlik_adi: 'Yıllık Genel Kurul',
+          tarih: '2024-03-15',
+          saat: '14:00',
+          konum: 'KAFKASDER Merkez',
+          sorumlu: 'Ali Veli',
+          durum: 'Planlandı',
+          aciklama: '2024 yılı genel kurul toplantısı'
+        }
+      ]
     }
   };
 
-  const handleImport = async () => {
-    if (!uploadedFile) {
-      toast.error('Lütfen önce bir dosya yükleyin');
-      return;
-    }
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-    setIsLoading(true);
-    setProgress(0);
-    setResult(null);
+    setSelectedFile(file);
+    await previewFile(file);
+  };
 
-    const options: BulkImportOptions = {
-      batchSize: settings.batchSize,
-      skipErrors: settings.skipErrors,
-      validateOnly: settings.validateOnly,
-      onProgress: (progressData) => {
-        setProgress(progressData.percentage);
-      }
-    };
-
+  const previewFile = async (file: File) => {
     try {
-      const importResult = await bulkImport(selectedDataType, uploadedFile.data, options);
-      setResult(importResult);
-      
-      if (importResult.success) {
-        toast.success(
-          settings.validateOnly 
-            ? 'Doğrulama tamamlandı'
-            : `${importResult.successfulImports} kayıt başarıyla içe aktarıldı`
-        );
-      } else {
-        toast.error(`İçe aktarma başarısız: ${importResult.failedImports} hata`);
-      }
+      const text = await file.text();
+      const lines = text.split('\n');
+      const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+      const data = lines.slice(1, 6).map(line => {
+        const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
+        const row: any = {};
+        headers.forEach((header, index) => {
+          row[header] = values[index] || '';
+        });
+        return row;
+      }).filter(row => Object.values(row).some(val => val !== ''));
+
+      setPreviewData(data);
     } catch (error) {
-      toast.error(`İçe aktarma hatası: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`);
-    } finally {
-      setIsLoading(false);
+      console.error('Dosya önizleme hatası:', error);
     }
   };
 
   const downloadTemplate = () => {
-    const csvContent = generateCSVTemplate(selectedDataType);
+    const template = importTemplates[importType];
+    const csvContent = [
+      template.fields.join(','),
+      ...template.sampleData.map(row => 
+        template.fields.map(field => `"${row[field] || ''}"`).join(',')
+      )
+    ].join('\n');
+
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `${selectedDataType}_template.csv`);
+    link.setAttribute('download', `${importType}_template.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    toast.success('Şablon dosyası indirildi');
   };
 
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  const processImport = async () => {
+    if (!selectedFile) return;
+
+    setIsProcessing(true);
+    const result: ImportResult = { success: 0, failed: 0, errors: [], warnings: [] };
+
+    try {
+      const text = await selectedFile.text();
+      const lines = text.split('\n');
+      const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+      const data = lines.slice(1).map(line => {
+        const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
+        const row: any = {};
+        headers.forEach((header, index) => {
+          row[header] = values[index] || '';
+        });
+        return row;
+      }).filter(row => Object.values(row).some(val => val !== ''));
+
+      // Veri doğrulama
+      for (let i = 0; i < data.length; i++) {
+        const row = data[i];
+        const rowNumber = i + 2; // Header + 1
+
+        try {
+          switch (importType) {
+            case 'persons':
+              await importPerson(row, result, rowNumber);
+              break;
+            case 'donations':
+              await importDonation(row, result, rowNumber);
+              break;
+            case 'projects':
+              await importProject(row, result, rowNumber);
+              break;
+            case 'events':
+              await importEvent(row, result, rowNumber);
+              break;
+          }
+        } catch (error: any) {
+          result.failed++;
+          result.errors.push(`Satır ${rowNumber}: ${error.message}`);
+        }
+      }
+
+      setResults(result);
+    } catch (error: any) {
+      result.failed++;
+      result.errors.push(`Genel hata: ${error.message}`);
+      setResults(result);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const importPerson = async (row: any, result: ImportResult, rowNumber: number) => {
+    // Veri doğrulama
+    if (!row.ad || !row.soyad) {
+      throw new Error('Ad ve soyad zorunludur');
+    }
+
+    if (row.tc_kimlik && row.tc_kimlik.length !== 11) {
+      result.warnings.push(`Satır ${rowNumber}: TC kimlik numarası 11 haneli olmalıdır`);
+    }
+
+    const personData: Partial<Person> = {
+      ad: row.ad,
+      soyad: row.soyad,
+      kimlikNo: row.tc_kimlik || '',
+      cepTelefonu: row.telefon || '',
+      email: row.email || '',
+      adres: row.adres || '',
+      kategori: row.kategori || 'Üye',
+      dogumTarihi: row.dogum_tarihi || '',
+      uyruk: ['TC'],
+      kimlikTuru: 'T.C. Kimlik No',
+      ulke: 'Türkiye',
+      sehir: '',
+      yerlesim: '',
+      mahalle: '',
+      dosyaNumarasi: `IMPORT-${Date.now()}-${rowNumber}`,
+      sponsorlukTipi: 'Bireysel',
+      kayitDurumu: 'Kaydedildi',
+      rizaBeyani: 'ALINMADI',
+      kayitTarihi: new Date().toISOString(),
+      kaydiAcanBirim: 'Toplu Import',
+      dosyaBaglantisi: 'Bağımsız',
+      isKaydiSil: false,
+      durum: 'Aktif'
+    };
+
+    const { error } = await supabase.from('persons').insert(personData);
+    if (error) throw new Error(error.message);
+
+    result.success++;
+  };
+
+  const importDonation = async (row: any, result: ImportResult, rowNumber: number) => {
+    if (!row.tutar || !row.bagisci_ad) {
+      throw new Error('Tutar ve bağışçı adı zorunludur');
+    }
+
+    // Önce kişiyi bul veya oluştur
+    let personId = 1; // Varsayılan
+    if (row.bagisci_ad) {
+      const { data: person } = await supabase
+        .from('persons')
+        .select('id')
+        .eq('ad', row.bagisci_ad)
+        .eq('soyad', row.bagisci_soyad || '')
+        .single();
+
+      if (!person) {
+        // Kişi yoksa oluştur
+        const { data: newPerson } = await supabase
+          .from('persons')
+          .insert({
+            ad: row.bagisci_ad,
+            soyad: row.bagisci_soyad || '',
+            kategori: 'Bağışçı',
+            dosyaNumarasi: `DONOR-${Date.now()}`,
+            kayitTarihi: new Date().toISOString()
+          })
+          .select('id')
+          .single();
+
+        personId = newPerson?.id || 1;
+      } else {
+        personId = person.id;
+      }
+    }
+
+    const donationData: Partial<Bagis> = {
+      bagisciId: personId,
+      tutar: parseFloat(row.tutar),
+      paraBirimi: row.para_birimi || 'TRY',
+      bagisTuru: row.bagis_turu || 'Nakit',
+      tarih: row.tarih || new Date().toISOString().split('T')[0],
+      aciklama: row.aciklama || 'Toplu import ile eklenen bağış',
+      makbuzNo: `IMPORT-${Date.now()}-${rowNumber}`
+    };
+
+    const { error } = await supabase.from('bagislar').insert(donationData);
+    if (error) throw new Error(error.message);
+
+    result.success++;
+  };
+
+  const importProject = async (row: any, result: ImportResult, rowNumber: number) => {
+    if (!row.proje_adi) {
+      throw new Error('Proje adı zorunludur');
+    }
+
+    const projectData: Partial<Proje> = {
+      name: row.proje_adi,
+      manager: row.sorumlu || '',
+      status: row.durum || 'Planlama',
+      startDate: row.baslangic_tarihi || new Date().toISOString().split('T')[0],
+      endDate: row.bitis_tarihi || '',
+      budget: parseFloat(row.butce) || 0,
+      spent: 0,
+      progress: 0,
+      description: row.aciklama || ''
+    };
+
+    const { error } = await supabase.from('projeler').insert(projectData);
+    if (error) throw new Error(error.message);
+
+    result.success++;
+  };
+
+  const importEvent = async (row: any, result: ImportResult, rowNumber: number) => {
+    if (!row.etkinlik_adi || !row.tarih) {
+      throw new Error('Etkinlik adı ve tarihi zorunludur');
+    }
+
+    const eventData: Partial<Etkinlik> = {
+      ad: row.etkinlik_adi,
+      tarih: row.tarih,
+      saat: row.saat || '',
+      konum: row.konum || '',
+      aciklama: row.aciklama || '',
+      status: row.durum || 'Planlama',
+      sorumluId: 1 // Varsayılan sorumlu
+    };
+
+    const { error } = await supabase.from('etkinlikler').insert(eventData);
+    if (error) throw new Error(error.message);
+
+    result.success++;
+  };
+
+  const resetImport = () => {
+    setSelectedFile(null);
+    setResults(null);
+    setPreviewData([]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-          Toplu Veri Yükleme
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          CSV, JSON veya Excel dosyalarından toplu veri içe aktarımı yapın
-        </p>
-      </div>
-
-      {/* Veri Türü Seçimi */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-          1. Veri Türünü Seçin
-        </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          {Object.entries(dataTypeLabels).map(([key, label]) => (
-            <button
-              key={key}
-              onClick={() => setSelectedDataType(key as SupportedDataType)}
-              className={`p-3 rounded-lg border-2 transition-all duration-200 ${
-                selectedDataType === key
-                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                  : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 text-gray-700 dark:text-gray-300'
-              }`}
-            >
-              <div className="text-sm font-medium">{label}</div>
-            </button>
-          ))}
-        </div>
+    <div className="p-6 max-w-4xl mx-auto">
+      <div className="bg-white rounded-lg shadow-lg p-6">
+        <h1 className="text-2xl font-bold text-gray-800 mb-6">📊 Toplu Veri Aktarımı</h1>
         
-        <div className="mt-4 flex gap-2">
+        {/* Import Türü Seçimi */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Veri Türü Seçin
+          </label>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {Object.entries(importTemplates).map(([key, template]) => (
+              <button
+                key={key}
+                onClick={() => setImportType(key as any)}
+                className={`p-4 rounded-lg border-2 transition-colors ${
+                  importType === key
+                    ? 'border-blue-500 bg-blue-50 text-blue-700'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center space-x-2">
+                  {key === 'persons' && <Users className="w-5 h-5" />}
+                  {key === 'donations' && <DollarSign className="w-5 h-5" />}
+                  {key === 'projects' && <FileText className="w-5 h-5" />}
+                  {key === 'events' && <Calendar className="w-5 h-5" />}
+                  <span className="font-medium">{template.name}</span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">{template.description}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Template İndirme */}
+        <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+          <h3 className="font-medium text-blue-800 mb-2">📋 Şablon İndirin</h3>
+          <p className="text-sm text-blue-600 mb-3">
+            {importTemplates[importType].name} için uygun şablonu indirin ve verilerinizi bu formatta hazırlayın.
+          </p>
           <button
             onClick={downloadTemplate}
-            className="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+            className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
           >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            Şablon İndir
+            <FileText className="w-4 h-4 inline mr-2" />
+            Şablon İndir (CSV)
           </button>
         </div>
-      </div>
 
-      {/* Dosya Yükleme */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-          2. Dosya Yükleyin
-        </h2>
-        
-        <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv,.json,.xlsx,.xls"
-            onChange={handleFileUpload}
-            className="hidden"
-          />
-          
-          {uploadedFile ? (
-            <div className="space-y-3">
-              <div className="flex items-center justify-center w-16 h-16 mx-auto bg-green-100 dark:bg-green-900/20 rounded-full">
-                <svg className="w-8 h-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-lg font-medium text-gray-900 dark:text-white">{uploadedFile.name}</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {formatFileSize(uploadedFile.size)} • {uploadedFile.data.length} kayıt
-                </p>
-              </div>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-              >
-                Farklı Dosya Seç
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="flex items-center justify-center w-16 h-16 mx-auto bg-gray-100 dark:bg-gray-700 rounded-full">
-                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-lg font-medium text-gray-900 dark:text-white">Dosya yükleyin</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  CSV, JSON veya Excel dosyası seçin
-                </p>
-              </div>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isLoading}
-                className="inline-flex items-center px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
-              >
-                {isLoading ? 'Yükleniyor...' : 'Dosya Seç'}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Önizleme */}
-      {showPreview && previewData.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            3. Veri Önizlemesi (İlk 10 Kayıt)
-          </h2>
-          
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                  {Object.keys(previewData[0] || {}).map((key) => (
-                    <th
-                      key={key}
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
-                    >
-                      {key}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {previewData.map((row, index) => (
-                  <tr key={index}>
-                    {Object.values(row).map((value: any, cellIndex) => (
-                      <td
-                        key={cellIndex}
-                        className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-300"
-                      >
-                        {String(value)}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* İçe Aktarma Ayarları */}
-      {uploadedFile && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            4. İçe Aktarma Ayarları
-          </h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="validateOnly"
-                checked={settings.validateOnly}
-                onChange={(e) => setSettings(prev => ({ ...prev, validateOnly: e.target.checked }))}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <label htmlFor="validateOnly" className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                Sadece doğrulama yap
-              </label>
-            </div>
-            
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="skipErrors"
-                checked={settings.skipErrors}
-                onChange={(e) => setSettings(prev => ({ ...prev, skipErrors: e.target.checked }))}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <label htmlFor="skipErrors" className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                Hataları atla
-              </label>
-            </div>
-            
-            <div>
-              <label htmlFor="batchSize" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Batch Boyutu
-              </label>
-              <select
-                id="batchSize"
-                value={settings.batchSize}
-                onChange={(e) => setSettings(prev => ({ ...prev, batchSize: Number(e.target.value) }))}
-                className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </select>
-            </div>
-          </div>
-          
-          <div className="mt-6">
+        {/* Dosya Yükleme */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            CSV Dosyası Seçin
+          </label>
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+            <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600 mb-2">
+              {selectedFile ? selectedFile.name : 'Dosya seçmek için tıklayın veya sürükleyin'}
+            </p>
             <button
-              onClick={handleImport}
-              disabled={isLoading}
-              className="w-full md:w-auto inline-flex items-center justify-center px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
+              onClick={() => fileInputRef.current?.click()}
+              className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors"
             >
-              {isLoading ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  İşleniyor...
-                </>
-              ) : (
-                settings.validateOnly ? 'Doğrulama Yap' : 'İçe Aktar'
-              )}
+              Dosya Seç
             </button>
           </div>
         </div>
-      )}
 
-      {/* İlerleme Çubuğu */}
-      {isLoading && progress > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">İlerleme</span>
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{Math.round(progress)}%</span>
+        {/* Önizleme */}
+        {previewData.length > 0 && (
+          <div className="mb-6">
+            <h3 className="font-medium text-gray-800 mb-2">👀 Veri Önizleme (İlk 5 satır)</h3>
+            <div className="overflow-x-auto">
+              <table className="min-w-full bg-white border border-gray-200">
+                <thead>
+                  <tr className="bg-gray-50">
+                    {Object.keys(previewData[0] || {}).map(header => (
+                      <th key={header} className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                        {header}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {previewData.map((row, index) => (
+                    <tr key={index} className="border-t border-gray-200">
+                      {Object.values(row).map((value, cellIndex) => (
+                        <td key={cellIndex} className="px-4 py-2 text-sm text-gray-900">
+                          {String(value)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-            <div
-              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            ></div>
-          </div>
+        )}
+
+        {/* İşlem Butonları */}
+        <div className="flex space-x-4">
+          <button
+            onClick={processImport}
+            disabled={!selectedFile || isProcessing}
+            className="bg-green-500 text-white px-6 py-2 rounded-lg hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+          >
+            {isProcessing ? 'İşleniyor...' : 'Verileri İçe Aktar'}
+          </button>
+          <button
+            onClick={resetImport}
+            className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition-colors"
+          >
+            Sıfırla
+          </button>
         </div>
-      )}
 
-      {/* Sonuçlar */}
-      {result && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            İçe Aktarma Sonuçları
-          </h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{result.totalRecords}</div>
-              <div className="text-sm text-blue-600 dark:text-blue-400">Toplam Kayıt</div>
-            </div>
+        {/* Sonuçlar */}
+        {results && (
+          <div className="mt-6 p-4 rounded-lg">
+            <h3 className="font-medium text-gray-800 mb-3">📊 İçe Aktarma Sonuçları</h3>
             
-            <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
-              <div className="text-2xl font-bold text-green-600 dark:text-green-400">{result.successfulImports}</div>
-              <div className="text-sm text-green-600 dark:text-green-400">Başarılı</div>
-            </div>
-            
-            <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg">
-              <div className="text-2xl font-bold text-red-600 dark:text-red-400">{result.failedImports}</div>
-              <div className="text-sm text-red-600 dark:text-red-400">Başarısız</div>
-            </div>
-            
-            <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
-              <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">{(result.duration / 1000).toFixed(2)}s</div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Süre</div>
-            </div>
-          </div>
-          
-          {result.errors.length > 0 && (
-            <div>
-              <h3 className="text-md font-medium text-gray-900 dark:text-white mb-3">Hatalar</h3>
-              <div className="max-h-64 overflow-y-auto">
-                {result.errors.map((error, index) => (
-                  <div key={index} className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 mb-2">
-                    <div className="text-sm font-medium text-red-800 dark:text-red-200">Satır {error.row}</div>
-                    <div className="text-sm text-red-600 dark:text-red-300">{error.error}</div>
-                    {error.data && (
-                      <div className="text-xs text-red-500 dark:text-red-400 mt-1">
-                        Veri: {JSON.stringify(error.data)}
-                      </div>
-                    )}
-                  </div>
-                ))}
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="bg-green-50 p-3 rounded-lg">
+                <div className="flex items-center">
+                  <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
+                  <span className="text-green-700 font-medium">
+                    Başarılı: {results.success}
+                  </span>
+                </div>
+              </div>
+              <div className="bg-red-50 p-3 rounded-lg">
+                <div className="flex items-center">
+                  <XCircle className="w-5 h-5 text-red-500 mr-2" />
+                  <span className="text-red-700 font-medium">
+                    Başarısız: {results.failed}
+                  </span>
+                </div>
               </div>
             </div>
-          )}
-        </div>
-      )}
+
+            {results.errors.length > 0 && (
+              <div className="mb-4">
+                <h4 className="font-medium text-red-700 mb-2">❌ Hatalar</h4>
+                <div className="bg-red-50 p-3 rounded-lg max-h-32 overflow-y-auto">
+                  {results.errors.map((error, index) => (
+                    <p key={index} className="text-sm text-red-600 mb-1">{error}</p>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {results.warnings.length > 0 && (
+              <div className="mb-4">
+                <h4 className="font-medium text-yellow-700 mb-2">⚠️ Uyarılar</h4>
+                <div className="bg-yellow-50 p-3 rounded-lg max-h-32 overflow-y-auto">
+                  {results.warnings.map((warning, index) => (
+                    <p key={index} className="text-sm text-yellow-600 mb-1">{warning}</p>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
