@@ -1,9 +1,9 @@
 name: Deploy
 on:
   push:
-    branches: kafkasderr
+    branches: main
   pull_request:
-    branches: kafkasderr
+    branches: main
 
 jobs:
   deploy:
