@@ -85,9 +85,7 @@ export interface WhatsAppSonuc {
 
 // Muhasebe Entegrasyonu Fonksiyonları
 export const muhasebeKaydiGonder = async (
-  entegrasyon: MuhasebeEntegrasyonu,
-  kayit: MuhasebeKaydi
-): Promise<{ basarili: boolean; hata?: string }> => {
+entegrasyon: MuhasebeEntegrasyonu, test: Mocha.TestFunction, kayit: MuhasebeKaydi): Promise<{ basarili: boolean; hata?: string }> => {
   try {
     const response = await fetch(`${entegrasyon.apiUrl}/api/kayit`, {
       method: 'POST',
@@ -132,7 +130,7 @@ export const bagisiMuhasebeKaydet = async (
     kategori: 'BAGIS' as HesapKategorisi
   };
 
-  await muhasebeKaydiGonder(entegrasyon, kayit);
+  await muhasebeKaydiGond er(entegrasyon, kayit);
 };
 
 // Banka API Fonksiyonları
