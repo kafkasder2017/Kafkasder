@@ -21,6 +21,14 @@ jobs:
     
     - name: Install dependencies
       run: npm ci
+      
+    - name: Cache Vercel
+      uses: actions/cache@v3
+      with:
+        path: ~/.vercel
+        key: ${{ runner.os }}-vercel-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-vercel-
     
     - name: Install Vercel CLI
       run: npm install --global vercel@latest
@@ -36,6 +44,7 @@ jobs:
       env:
         VITE_SUPABASE_URL: https://eqtsssgwcgiognmoxuuz.supabase.co
         VITE_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxdHNzc2d3Y2dpb2dubW94dXV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM4MzI3NzEsImV4cCI6MjA2OTQwODc3MX0.kCTHrkuSLQ5Pi8ijmXCIPkA5rMzDfS2QpeMQQ8Zg3Sc
+        NODE_ENV: production
     
     - name: Deploy Project Artifacts to Vercel
       run: vercel deploy --prebuilt --prod --token=Q6s7u39j25K3eipLl35BLstr
