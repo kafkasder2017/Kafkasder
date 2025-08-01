@@ -22,18 +22,21 @@ jobs:
     - name: Install dependencies
       run: npm ci
     
-    - name: Build
-      run: npm run build
-      env:
-        VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-        VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+    - name: Install Vercel CLI
+      run: npm install --global vercel@latest
     
-    - name: Deploy to Vercel
-      uses: amondnet/vercel-action@v25
-      with:
-        vercel-token: ${{ secrets.VERCEL_TOKEN }}
-        vercel-org-id: ${{ secrets.ORG_ID }}
-        vercel-project-id: ${{ secrets.PROJECT_ID }}
-        vercel-args: '--prod'
-          
+    - name: Pull Vercel Environment Information
+      run: vercel pull --yes --environment=preview --token=Q6s7u39j25K3eipLl35BLstr
+      env:
+        VITE_SUPABASE_URL: https://eqtsssgwcgiognmoxuuz.supabase.co
+        VITE_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxdHNzc2d3Y2dpb2dubW94dXV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM4MzI3NzEsImV4cCI6MjA2OTQwODc3MX0.kCTHrkuSLQ5Pi8ijmXCIPkA5rMzDfS2QpeMQQ8Zg3Sc
+    
+    - name: Build Project Artifacts
+      run: vercel build --token=Q6s7u39j25K3eipLl35BLstr
+      env:
+        VITE_SUPABASE_URL: https://eqtsssgwcgiognmoxuuz.supabase.co
+        VITE_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxdHNzc2d3Y2dpb2dubW94dXV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM4MzI3NzEsImV4cCI6MjA2OTQwODc3MX0.kCTHrkuSLQ5Pi8ijmXCIPkA5rMzDfS2QpeMQQ8Zg3Sc
+    
+    - name: Deploy Project Artifacts to Vercel
+      run: vercel deploy --prebuilt --prod --token=Q6s7u39j25K3eipLl35BLstr
           
