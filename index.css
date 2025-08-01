@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+}
+
+@layer utilities {
+  /* Smooth transitions for dashboard elements */
+  .dashboard-transition {
+    transition: all 0.2s ease-in-out;
+  }
+  
+  /* Prevent layout shifts */
+  .dashboard-card {
+    will-change: transform;
+    transform: translateZ(0);
+  }
+  
+  /* Optimize chart animations */
+  .chart-container {
+    contain: layout style paint;
+  }
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+} 

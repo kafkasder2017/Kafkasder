@@ -1,187 +1,246 @@
+import L from 'leaflet';
 import React, { useState, useEffect, useMemo } from 'react';
-import * as ReactRouterDOM from 'react-router-dom';
-import * as Leaflet from 'leaflet';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import { getPeople, getKumbaralar } from '../services/apiService';
-import { Person, Kumbara, MembershipType } from '../types';
 
-// Fix for default icon issue with bundlers like esm.sh
-const DefaultIcon = Leaflet.icon({
-    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
-    shadowSize: [41, 41]
+import 'leaflet/dist/leaflet.css';
+import type { Person } from '../types';
+import type { Kumbara } from '../types';
+
+// Fix for default markers
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl:
+    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl:
+    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl:
+    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png'
 });
-Leaflet.Marker.prototype.options.icon = DefaultIcon;
-
-const recipientIcon = new Leaflet.Icon({
-    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-    iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
-});
-
-const volunteerIcon = new Leaflet.Icon({
-    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-    iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
-});
-
-const kumbaraIcon = new Leaflet.Icon({
-    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-    iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
-});
-
-type LayerType = 'recipients' | 'volunteers' | 'boxes';
 
 interface MapPoint {
-    id: string;
-    lat: number;
-    lng: number;
-    type: LayerType;
-    data: Person | Kumbara;
+  id: string;
+  lat: number;
+  lng: number;
+  type: 'recipients' | 'volunteers' | 'kumbaralar';
+  data: Person | Kumbara;
 }
 
-const HaritaModulu: React.FC = () => {
-    const [people, setPeople] = useState<Person[]>([]);
-    const [kumbaralar, setKumbaralar] = useState<Kumbara[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState('');
-    const [layers, setLayers] = useState<Record<LayerType, boolean>>({
-        recipients: true,
-        volunteers: false,
-        boxes: true,
-    });
-    const position: Leaflet.LatLngExpression = [41.0082, 28.9784]; // Istanbul center
+const getMarkerIcon = (type: string): L.Icon => {
+  const iconSize: [number, number] = [25, 41];
+  const iconAnchor: [number, number] = [12, 41];
+  const popupAnchor: [number, number] = [1, -34];
 
-    useEffect(() => {
-        const fetchData = async () => {
-            setIsLoading(true);
-            try {
-                const [peopleData, kumbaralarData] = await Promise.all([getPeople(), getKumbaralar()]);
-                setPeople(peopleData);
-                setKumbaralar(kumbaralarData);
-            } catch (err: any) {
-                setError(err.message || "Harita verileri yüklenemedi.");
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        fetchData();
-    }, []);
-
-    const mapPoints = useMemo((): MapPoint[] => {
-        const points: MapPoint[] = [];
-
-        if (layers.recipients) {
-            people
-                .filter(p => p.lat && p.lng && p.aldigiYardimTuru && p.aldigiYardimTuru.length > 0)
-                .forEach(p => points.push({ id: `person-${p.id}`, lat: p.lat!, lng: p.lng!, type: 'recipients', data: p }));
-        }
-        if (layers.volunteers) {
-            people
-                .filter(p => p.lat && p.lng && p.membershipType === MembershipType.GONULLU)
-                .forEach(p => points.push({ id: `person-${p.id}`, lat: p.lat!, lng: p.lng!, type: 'volunteers', data: p }));
-        }
-        if (layers.boxes) {
-            kumbaralar
-                .filter(k => k.lat && k.lng)
-                .forEach(k => points.push({ id: `kumbara-${k.id}`, lat: k.lat!, lng: k.lng!, type: 'boxes', data: k }));
-        }
-
-        return points;
-    }, [people, kumbaralar, layers]);
-
-    const getMarkerIcon = (type: LayerType) => {
-        switch (type) {
-            case 'recipients': return recipientIcon;
-            case 'volunteers': return volunteerIcon;
-            case 'boxes': return kumbaraIcon;
-            default: return DefaultIcon;
-        }
-    };
-    
-    if (isLoading) {
-        return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div></div>;
-    }
-
-    if (error) {
-        return <div className="p-4 bg-red-100 text-red-700 rounded-lg">{error}</div>;
-    }
-
-    return (
-        <div className="h-full w-full relative">
-            <MapContainer center={position} zoom={11} scrollWheelZoom={true} className="h-full w-full rounded-xl">
-                <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                {mapPoints.map(point => (
-                    <Marker key={point.id} position={[point.lat, point.lng]} icon={getMarkerIcon(point.type)}>
-                        <Popup>
-                            {point.type === 'recipients' || point.type === 'volunteers' ? (
-                                <PersonPopup person={point.data as Person} />
-                            ) : (
-                                <KumbaraPopup kumbara={point.data as Kumbara} />
-                            )}
-                        </Popup>
-                    </Marker>
-                ))}
-            </MapContainer>
-            <LayerControl layers={layers} setLayers={setLayers} />
-        </div>
-    );
-};
-
-
-const LayerControl: React.FC<{ layers: Record<LayerType, boolean>, setLayers: React.Dispatch<React.SetStateAction<Record<LayerType, boolean>>> }> = ({ layers, setLayers }) => {
-    const handleLayerChange = (layer: LayerType) => {
-        setLayers(prev => ({ ...prev, [layer]: !prev[layer] }));
-    };
-
-    return (
-        <div className="absolute top-4 right-4 z-[1000] bg-white dark:bg-zinc-800 p-4 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700">
-            <h4 className="font-semibold text-zinc-800 dark:text-zinc-200 mb-2">Katmanlar</h4>
-            <div className="space-y-2">
-                <label className="flex items-center space-x-2 cursor-pointer">
-                    <input type="checkbox" checked={layers.recipients} onChange={() => handleLayerChange('recipients')} className="rounded text-red-500 focus:ring-red-500" />
-                    <span className="text-sm text-zinc-700 dark:text-zinc-300">Yardım Alanlar</span>
-                </label>
-                <label className="flex items-center space-x-2 cursor-pointer">
-                    <input type="checkbox" checked={layers.volunteers} onChange={() => handleLayerChange('volunteers')} className="rounded text-green-500 focus:ring-green-500" />
-                    <span className="text-sm text-zinc-700 dark:text-zinc-300">Gönüllüler</span>
-                </label>
-                <label className="flex items-center space-x-2 cursor-pointer">
-                    <input type="checkbox" checked={layers.boxes} onChange={() => handleLayerChange('boxes')} className="rounded text-blue-500 focus:ring-blue-500" />
-                    <span className="text-sm text-zinc-700 dark:text-zinc-300">Kumbaralar</span>
-                </label>
-            </div>
-        </div>
-    );
+  switch (type) {
+    case 'recipients':
+      return L.icon({
+        iconUrl:
+          'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-red.png',
+        iconSize,
+        iconAnchor,
+        popupAnchor
+      });
+    case 'volunteers':
+      return L.icon({
+        iconUrl:
+          'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-green.png',
+        iconSize,
+        iconAnchor,
+        popupAnchor
+      });
+    case 'kumbaralar':
+      return L.icon({
+        iconUrl:
+          'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-blue.png',
+        iconSize,
+        iconAnchor,
+        popupAnchor
+      });
+    default:
+      return L.icon({
+        iconUrl:
+          'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+        iconSize,
+        iconAnchor,
+        popupAnchor
+      });
+  }
 };
 
 const PersonPopup: React.FC<{ person: Person }> = ({ person }) => (
-    <div className="text-sm">
-        <h5 className="font-bold">{person.ad} {person.soyad}</h5>
-        <p>{person.adres}</p>
-        <p><span className="font-semibold">Durum:</span> {person.durum}</p>
-        <ReactRouterDOM.Link to={`/kisiler/${person.id}`} className="text-blue-600 font-semibold hover:underline mt-1 block">
-            Detayları Görüntüle &rarr;
-        </ReactRouterDOM.Link>
-    </div>
+  <div className='p-2'>
+    <h3 className='font-semibold text-sm'>
+      {person.ad} {person.soyad}
+    </h3>
+    <p className='text-xs text-gray-600'>{person.cepTelefonu}</p>
+    <p className='text-xs text-gray-600'>{person.adres}</p>
+  </div>
 );
 
 const KumbaraPopup: React.FC<{ kumbara: Kumbara }> = ({ kumbara }) => (
-    <div className="text-sm">
-        <h5 className="font-bold">Kumbara: {kumbara.code}</h5>
-        <p>{kumbara.location}</p>
-        <p><span className="font-semibold">Bakiye:</span> {kumbara.balance.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}</p>
-         <ReactRouterDOM.Link to="/kumbaralar" className="text-blue-600 font-semibold hover:underline mt-1 block">
-            Kumbara Yönetimine Git &rarr;
-        </ReactRouterDOM.Link>
-    </div>
+  <div className='p-2'>
+    <h3 className='font-semibold text-sm'>{kumbara.code}</h3>
+    <p className='text-xs text-gray-600'>{kumbara.location}</p>
+    <p className='text-xs text-gray-600'>
+      Toplam: {kumbara.balance?.toLocaleString('tr-TR')} TL
+    </p>
+  </div>
 );
+
+const MapUpdater: React.FC<{ center: [number, number] }> = ({
+  center
+}: {
+  center: [number, number];
+}) => {
+  const map = useMap();
+
+  useEffect(() => {
+    map.setView(center, map.getZoom());
+  }, [center, map]);
+
+  return null;
+};
+
+const HaritaModulu: React.FC = () => {
+  const [selectedType, setSelectedType] = useState<
+    'all' | 'recipients' | 'volunteers' | 'kumbaralar'
+  >('all');
+  const [center, setCenter] = useState<[number, number]>([41.0082, 28.9784]); // Istanbul
+
+  const mapPoints = useMemo((): MapPoint[] => {
+    const points: MapPoint[] = [];
+
+    // Mock data kaldırıldı - artık boş array kullanılıyor
+    // Gerçek veri API'den gelecek
+
+    return points;
+  }, []);
+
+  const filteredPoints = useMemo(() => {
+    if (selectedType === 'all') return mapPoints;
+    return mapPoints.filter(point => point.type === selectedType);
+  }, [mapPoints, selectedType]);
+
+  const handleTypeChange = (
+    type: 'all' | 'recipients' | 'volunteers' | 'kumbaralar'
+  ) => {
+    setSelectedType(type);
+  };
+
+  return (
+    <div className='h-full flex flex-col'>
+      <div className='bg-white dark:bg-zinc-800 p-4 border-b border-zinc-200 dark:border-zinc-700'>
+        <h1 className='text-2xl font-bold text-zinc-800 dark:text-white mb-4'>
+          Harita Modülü
+        </h1>
+
+        <div className='flex flex-wrap gap-2 mb-4'>
+          <button
+            onClick={() => handleTypeChange('all')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              selectedType === 'all'
+                ? 'bg-blue-500 text-white'
+                : 'bg-zinc-100 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600'
+            }`}
+          >
+            Tümü ({mapPoints.length})
+          </button>
+          <button
+            onClick={() => handleTypeChange('recipients')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              selectedType === 'recipients'
+                ? 'bg-red-500 text-white'
+                : 'bg-zinc-100 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600'
+            }`}
+          >
+            Yardım Alanlar (
+            {mapPoints.filter(p => p.type === 'recipients').length})
+          </button>
+          <button
+            onClick={() => handleTypeChange('volunteers')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              selectedType === 'volunteers'
+                ? 'bg-green-500 text-white'
+                : 'bg-zinc-100 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600'
+            }`}
+          >
+            Gönüllüler ({mapPoints.filter(p => p.type === 'volunteers').length})
+          </button>
+          <button
+            onClick={() => handleTypeChange('kumbaralar')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              selectedType === 'kumbaralar'
+                ? 'bg-blue-500 text-white'
+                : 'bg-zinc-100 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600'
+            }`}
+          >
+            Kumbaralar ({mapPoints.filter(p => p.type === 'kumbaralar').length})
+          </button>
+        </div>
+
+        <div className='grid grid-cols-1 md:grid-cols-3 gap-4 text-sm'>
+          <div className='bg-red-50 dark:bg-red-900/20 p-3 rounded-lg'>
+            <div className='flex items-center gap-2'>
+              <div className='w-3 h-3 bg-red-500 rounded-full'></div>
+              <span className='font-medium'>Yardım Alanlar</span>
+            </div>
+            <p className='text-red-600 dark:text-red-400 mt-1'>
+              {mapPoints.filter(p => p.type === 'recipients').length} kişi
+            </p>
+          </div>
+          <div className='bg-green-50 dark:bg-green-900/20 p-3 rounded-lg'>
+            <div className='flex items-center gap-2'>
+              <div className='w-3 h-3 bg-green-500 rounded-full'></div>
+              <span className='font-medium'>Gönüllüler</span>
+            </div>
+            <p className='text-green-600 dark:text-green-400 mt-1'>
+              {mapPoints.filter(p => p.type === 'volunteers').length} kişi
+            </p>
+          </div>
+          <div className='bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg'>
+            <div className='flex items-center gap-2'>
+              <div className='w-3 h-3 bg-blue-500 rounded-full'></div>
+              <span className='font-medium'>Kumbaralar</span>
+            </div>
+            <p className='text-blue-600 dark:text-blue-400 mt-1'>
+              {mapPoints.filter(p => p.type === 'kumbaralar').length} adet
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className='flex-1 relative'>
+        <MapContainer
+          center={center}
+          zoom={10}
+          className='h-full w-full'
+          style={{ height: '100%', width: '100%' }}
+        >
+          <TileLayer
+            url='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          />
+
+          {filteredPoints.map(point => (
+            <Marker
+              key={point.id}
+              position={[point.lat, point.lng]}
+              icon={getMarkerIcon(point.type)}
+            >
+              <Popup>
+                {point.type === 'recipients' || point.type === 'volunteers' ? (
+                  <PersonPopup person={point.data as Person} />
+                ) : (
+                  <KumbaraPopup kumbara={point.data as Kumbara} />
+                )}
+              </Popup>
+            </Marker>
+          ))}
+
+          <MapUpdater center={center} />
+        </MapContainer>
+      </div>
+    </div>
+  );
+};
 
 export default HaritaModulu;

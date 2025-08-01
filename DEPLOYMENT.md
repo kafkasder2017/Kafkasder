@@ -6,7 +6,7 @@ This guide will help you deploy the KAFKASDER Panel to Vercel.
 
 1. A Vercel account (sign up at [vercel.com](https://vercel.com))
 2. Your project pushed to a Git repository (GitHub, GitLab, or Bitbucket)
-3. Gemini API key for the AI features
+
 
 ## Deployment Steps
 
@@ -33,7 +33,7 @@ In the Vercel dashboard, go to your project settings and add the following envir
 #### Required Variables
 
 ```
-GEMINI_API_KEY=your_actual_gemini_api_key_here
+
 
 # Supabase Database Configuration
 POSTGRES_URL=postgres://postgres.eqtsssgwcgiognmoxuuz:HMNx3EEaXkRkGxjP@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require&supa=base-pooler.x
@@ -56,7 +56,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzd
 ```
 
 **Important**: 
-- Replace `your_actual_gemini_api_key_here` with your real Gemini API key
+
 - The Supabase credentials above are already configured for your project
 
 ### 4. Deploy
@@ -78,7 +78,7 @@ The following files have been created/configured for Vercel deployment:
 ### Required Variables
 
 #### AI & External Services
-- `GEMINI_API_KEY` - Your Google Gemini API key for AI features
+
 
 #### Supabase Database Configuration
 - `POSTGRES_URL` - Main PostgreSQL connection URL with pooling
