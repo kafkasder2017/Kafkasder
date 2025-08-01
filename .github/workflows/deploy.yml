@@ -65,4 +65,12 @@ jobs:
         DEPLOYMENT_URL=$(vercel ls --token=Q6s7u39j25K3eipLl35BLstr | grep "Production" | awk '{print $2}')
         echo "deployment_url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
         echo "Deployment URL: $DEPLOYMENT_URL"
+        
+    - name: Monitor Deployment Status
+      run: |
+        echo "Waiting for deployment to be ready..."
+        sleep 30
+        npm run deploy:monitor
+      env:
+        VERCEL_TOKEN: Q6s7u39j25K3eipLl35BLstr
           

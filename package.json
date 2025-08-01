@@ -8,6 +8,7 @@
     "build": "tsc && vite build",
     "build:prod": "tsc && vite build --mode production",
     "preview": "vite preview",
+    "deploy:monitor": "node scripts/deploy-monitor.js",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
