@@ -1,9 +1,16 @@
-import type {
-  Bagis,
-  Person,
-  FinansalKayit,
-  HesapKategorisi,
-  FinansalIslemTuru
+import {
+  type Bagis,
+  type Person,
+  type FinansalKayit,
+  type HesapKategorisi,
+  type FinansalIslemTuru,
+  KimlikTuru,
+  RizaBeyaniStatus,
+  SponsorlukTipi,
+  Uyruk,
+  DosyaBaglantisi,
+  PersonStatus,
+  BagisTuru
 } from '../types';
 import { createBagis, createFinansalKayit, createPerson } from './apiService';
 
@@ -130,7 +137,10 @@ export const bagisiMuhasebeKaydet = async (
     kategori: 'BAGIS' as HesapKategorisi
   };
 
-  await muhasebeKaydiGond er(entegrasyon, kayit);
+  const result = await muhasebeKaydiGonder(entegrasyon, test, kayit);
+  if (!result.basarili) {
+    throw new Error(`Muhasebe kaydı gönderilemedi: ${result.hata}`);
+  }
 };
 
 // Banka API Fonksiyonları
@@ -196,8 +206,8 @@ export const otomatikBagisKaydet = async (
           const yeniKisi: Omit<Person, 'id'> = {
             ad: hareket.gonderenAd.split(' ')[0] || 'Bilinmeyen',
             soyad: hareket.gonderenAd.split(' ').slice(1).join(' ') || '',
-            uyruk: ['TC'],
-            kimlikTuru: 'TC',
+            uyruk: [Uyruk.TC],
+            kimlikTuru: KimlikTuru.TC,
             kimlikNo: '',
             dogumTarihi: '',
             cepTelefonu: '',
@@ -208,14 +218,14 @@ export const otomatikBagisKaydet = async (
             adres: '',
             kategori: 'Bağışçı',
             dosyaNumarasi: `AUTO-${Date.now()}`,
-            sponsorlukTipi: 'BIREYSEL',
+            sponsorlukTipi: SponsorlukTipi.BIREYSEL,
             kayitDurumu: 'Kaydedildi',
-            rizaBeyani: 'ALINMADI',
+            rizaBeyani: 'ALINMADI' as RizaBeyaniStatus,
             kayitTarihi: new Date().toISOString(),
             kaydiAcanBirim: 'Sistem',
-            dosyaBaglantisi: 'BAGIMSIZ',
+            dosyaBaglantisi: DosyaBaglantisi.BAGIMSIZ,
             isKaydiSil: false,
-            durum: 'AKTIF'
+            durum: PersonStatus.AKTIF
           };
           
           const kisi = await createPerson(yeniKisi);
@@ -227,7 +237,7 @@ export const otomatikBagisKaydet = async (
           bagisciId,
           tutar: hareket.tutar,
           paraBirimi: 'TRY',
-          bagisTuru: 'BANKA_TRANSFERI',
+          bagisTuru: BagisTuru.BANKA_TRANSFERI,
           tarih: hareket.tarih,
           aciklama: `Otomatik bağış - ${hareket.aciklama}`,
           makbuzNo: hareket.referansNo
@@ -430,3 +440,7 @@ export const entegrasyonAyarlariniKaydet = async (
   // Supabase'e entegrasyon ayarlarını kaydet
   // Bu fonksiyon gerçek implementasyonda ayarları veritabanına kaydedecek
 };
+
+function er(entegrasyon: MuhasebeEntegrasyonu, kayit: MuhasebeKaydi) {
+  throw new Error('Function not implemented.');
+}
