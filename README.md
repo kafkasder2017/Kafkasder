@@ -797,4 +797,5 @@ Bu projeyi mümkün kılan tüm katkıda bulunanlara teşekkürler:
 [![GitHub forks](https://img.shields.io/github/forks/your-username/kafkasder-panel?style=social)](https://github.com/your-username/kafkasder-panel)
 [![GitHub issues](https://img.shields.io/github/issues/your-username/kafkasder-panel)](https://github.com/your-username/kafkasder-panel/issues)
 
-</div> 
+</div> #   K a f k a s d e r  
+ 
