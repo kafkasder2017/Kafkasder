@@ -61,6 +61,8 @@
     ".vercel",
     "coverage",
     "vite.config.ts",
-    "postcss.config.js"
+    "postcss.config.js",
+    "server.ts",
+    "deno.json"
   ]
 }

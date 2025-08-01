@@ -1,0 +1,16 @@
+{
+  "tasks": {
+    "dev": "deno run --allow-net --allow-read --allow-env --watch server.ts",
+    "start": "deno run --allow-net --allow-read --allow-env server.ts",
+    "build": "npm run build"
+  },
+  "imports": {
+    "@std/http": "https://deno.land/std@0.208.0/http/mod.ts",
+    "@std/path": "https://deno.land/std@0.208.0/path/mod.ts",
+    "@std/media-types": "https://deno.land/std@0.208.0/media_types/mod.ts"
+  },
+  "compilerOptions": {
+    "lib": ["deno.window"],
+    "strict": true
+  }
+}
