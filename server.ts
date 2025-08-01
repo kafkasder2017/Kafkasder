@@ -1,10 +1,7 @@
-import { serve } from "@hono/node-server";
-import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
-import { join } from "path";
-import { readFile } from "fs/promises";
+import { serveStatic } from "hono/deno";
 
-const PORT = parseInt(process.env.PORT || "8000");
+const PORT = parseInt(Deno.env.get("PORT") || "8000");
 const app = new Hono();
 
 // Serve static files from dist directory
@@ -13,8 +10,8 @@ app.use("/*", serveStatic({ root: "./dist" }));
 // SPA fallback - serve index.html for all routes
 app.get("*", async (c) => {
   try {
-    const indexPath = join(process.cwd(), "dist", "index.html");
-    const indexFile = await readFile(indexPath);
+    const indexPath = "./dist/index.html";
+    const indexFile = await Deno.readTextFile(indexPath);
     
     return new Response(indexFile, {
       headers: {
@@ -32,4 +29,4 @@ app.get("*", async (c) => {
 });
 
 console.log(`Server starting on port ${PORT}`);
-serve(app, { port: PORT });
+Deno.serve({ port: PORT }, app.fetch);
